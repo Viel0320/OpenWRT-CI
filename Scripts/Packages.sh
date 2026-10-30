@@ -56,6 +56,7 @@ UPDATE_PACKAGE "kucat-config" "sirpdboy/luci-app-kucat-config" "master"
 UPDATE_PACKAGE "shadcn" "eamonxg/luci-theme-shadcn" "main"
 UPDATE_PACKAGE "vantage" "anothaDev/luci-theme-vantage" "main"
 
+UPDATE_PACKAGE "honk" "kenzok8/openwrt-honk" "main"
 UPDATE_PACKAGE "momo" "nikkinikki-org/OpenWrt-momo" "main"
 UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main"
 UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
