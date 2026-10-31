@@ -68,6 +68,19 @@ jobs:
       cache_prefix: ${{steps.initialize-values.outputs.cache_prefix}}
       cache_key: ${{steps.clone-code.outputs.cache_key}}
     steps:
+    
+    # Free preinstalled packages to make room for the huge build_dir
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost /opt/google 2>/dev/null || true
+          sudo docker image prune -af 2>/dev/null || true
+          sudo apt-get -yqq remove --purge '^dotnet-.*' '^llvm-.*' 'php.*' \
+            '^mongodb-.*' '^mysql-.*' azure-cli google-cloud-cli 2>/dev/null || true
+          sudo apt-get -yqq autoremove --purge
+
+          
       - name: Checkout Projects
         uses: actions/checkout@main
 
