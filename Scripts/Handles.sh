@@ -37,14 +37,6 @@ FIX "theme-vantage" "$PACKAGE_PATH/luci-theme-vantage" sed -i \
 	-e '/^\/\* progress bars: thin track/,$ { /^\.cbi-progressbar::before {/,/^}/ { s/^[[:space:]]*font: 500 var(--fs-micro)\/1\.2 var(--mono);/\tfont: inherit; line-height: normal;/; } }' \
 	"$PACKAGE_PATH/luci-theme-vantage/luci-theme-vantage/htdocs/luci-static/vantage/vantage.css"
 
-#修复vantage表单说明宽度和进度条标签字体（anothaDev/luci-theme-vantage#51、#52）
-FIX "theme-vantage" "$PACKAGE_PATH/luci-theme-vantage" sed -i \
-	-e '/^\.cbi-map-descr {/,/^}/ { /max-width: 76ch;/d; }' \
-	-e 's/^\(\.cbi-section-descr { \)max-width: 80ch; /\1/' \
-	-e '/^\.cbi-value-description {/,/^}/ { /max-width: 70ch;/d; }' \
-	-e '/^\/\* progress bars: thin track/,$ { /^\.cbi-progressbar::before {/,/^}/ { s/^[[:space:]]*font: 500 var(--fs-micro)\/1\.2 var(--mono);/\tfont: inherit; line-height: normal;/; } }' \
-	"$PACKAGE_PATH/luci-theme-vantage/luci-theme-vantage/htdocs/luci-static/vantage/vantage.css"
-
 #修改mini-diskmanager菜单位置
 FIX "mini-diskmanager" "$PACKAGE_PATH/luci-app-mini-diskmanager" sed -i "s/services/system/g" \
 	"$PACKAGE_PATH/luci-app-mini-diskmanager/luci-app-mini-diskmanager/root/usr/share/luci/menu.d/luci-app-mini-diskmanager.json"
