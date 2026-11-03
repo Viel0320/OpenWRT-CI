@@ -81,3 +81,5 @@ jobs:
       WRT_PACKAGE: ${{inputs.PACKAGE}}
       #仅输出配置文件
       WRT_TEST: ${{inputs.TEST || false}}
+      #额外打包修复（MTK 配置：nft / docker）
+      WRT_FIXES: ${{contains(inputs.CONFIG, 'MEDIATEK')}}

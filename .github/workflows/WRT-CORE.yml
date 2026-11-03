@@ -44,6 +44,10 @@ on:
         required: false
         default: false
         type: boolean
+      WRT_FIXES:
+        required: false
+        default: false
+        type: boolean
 
 env:
   GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
@@ -59,6 +63,7 @@ env:
   WRT_SOURCE: ${{inputs.WRT_SOURCE}}
   WRT_PACKAGE: ${{inputs.WRT_PACKAGE}}
   WRT_TEST: ${{inputs.WRT_TEST}}
+  WRT_FIXES: ${{inputs.WRT_FIXES}}
 
 jobs:
   core:
@@ -180,6 +185,14 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Handles.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-i2c-tools.sh
 
+      - name: Custom Fixes
+        if: ${{ inputs.WRT_FIXES }}
+        run: |
+          cd ./wrt/
+
+          $GITHUB_WORKSPACE/Scripts/nft-fixes.sh bridge
+          $GITHUB_WORKSPACE/Scripts/docker-fixes.sh
+
       - name: Custom Settings
         run: |
           cd ./wrt/
@@ -192,6 +205,11 @@ jobs:
 
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
+
+          #iptables 到 nftables 的依赖整理，必须在 .config 生成之后
+          if [[ "$WRT_FIXES" == 'true' ]]; then
+            $GITHUB_WORKSPACE/Scripts/nft-fixes.sh deps
+          fi
 
           make defconfig -j$(nproc) && make clean -j$(nproc)
 
