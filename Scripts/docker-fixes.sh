@@ -83,31 +83,40 @@ else
 fi
 log "版本: $DOCKER_VER | dockerd: $DOCKERD_COMMIT | cli: $DOCKER_CLI_COMMIT"
 
-dockerd_makefile=$(find package/ feeds/ -name Makefile -print0 2>/dev/null \
-    | xargs -0 grep -lE "^PKG_NAME:=dockerd$" 2>/dev/null | head -n 1)
-docker_makefile=$(find package/ feeds/ -name Makefile -print0 2>/dev/null \
-    | xargs -0 grep -lE "^PKG_NAME:=docker$" 2>/dev/null | head -n 1)
+# 同名包可能同时存在多份 Makefile（feeds 一份、package/ 下自维护副本一份），
+# 实际参与编译的是哪一份取决于扫描顺序，所以全部都要修。
+find_makefiles() {
+    find package/ feeds/ -name Makefile -print0 2>/dev/null \
+        | xargs -0 grep -lE "^PKG_NAME:=$1$" 2>/dev/null || true
+}
 
-if [ -f "$dockerd_makefile" ]; then
-    log "处理 $dockerd_makefile"
-    sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$dockerd_makefile"
-    sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=$DOCKERD_COMMIT/g" "$dockerd_makefile"
-    sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$dockerd_makefile"
-    sed -i '/define Build\/Prepare/,/endef/c\define Build\/Prepare\n\t$(Build\/Prepare\/Default)\nendef' "$dockerd_makefile"
-    sed -i 's/^\t$(call EnsureVendored/#\t$(call EnsureVendored/g' "$dockerd_makefile"
+dockerd_makefiles=$(find_makefiles dockerd)
+docker_makefiles=$(find_makefiles docker)
+
+if [ -n "$dockerd_makefiles" ]; then
+    printf '%s\n' "$dockerd_makefiles" | while IFS= read -r makefile; do
+        log "处理 $makefile"
+        sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$makefile"
+        sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=$DOCKERD_COMMIT/g" "$makefile"
+        sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$makefile"
+        sed -i '/define Build\/Prepare/,/endef/c\define Build\/Prepare\n\t$(Build\/Prepare\/Default)\nendef' "$makefile"
+        sed -i 's/^\t$(call EnsureVendored/#\t$(call EnsureVendored/g' "$makefile"
+    done
 else
     log "警告: 未找到 dockerd 的 Makefile，跳过引擎修补"
 fi
 
-if [ -f "$docker_makefile" ]; then
-    log "处理 $docker_makefile"
-    sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$docker_makefile"
-    sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=$DOCKER_CLI_COMMIT/g" "$docker_makefile"
-    sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$docker_makefile"
-    sed -i '/define Build\/Prepare/,/endef/c\define Build\/Prepare\n\t$(Build\/Prepare\/Default)\nendef' "$docker_makefile"
-    if ! grep -qF 'vendor/github.com/santhosh-tekuri/jsonschema/v6/metaschemas' "$docker_makefile"; then
-        sed -i '/^define Build\/Compile/i GO_PKG_INSTALL_EXTRA += vendor/github.com/santhosh-tekuri/jsonschema/v6/metaschemas' "$docker_makefile"
-    fi
+if [ -n "$docker_makefiles" ]; then
+    printf '%s\n' "$docker_makefiles" | while IFS= read -r makefile; do
+        log "处理 $makefile"
+        sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$makefile"
+        sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=$DOCKER_CLI_COMMIT/g" "$makefile"
+        sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$makefile"
+        sed -i '/define Build\/Prepare/,/endef/c\define Build\/Prepare\n\t$(Build\/Prepare\/Default)\nendef' "$makefile"
+        if ! grep -qF 'vendor/github.com/santhosh-tekuri/jsonschema/v6/metaschemas' "$makefile"; then
+            sed -i '/^define Build\/Compile/i GO_PKG_INSTALL_EXTRA += vendor/github.com/santhosh-tekuri/jsonschema/v6/metaschemas' "$makefile"
+        fi
+    done
 else
     log "警告: 未找到 docker CLI 的 Makefile，跳过 CLI 修补"
 fi
