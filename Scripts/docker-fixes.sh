@@ -7,7 +7,8 @@
 # 做的事情：
 #   1. LuCI dockerman 去重：存在自维护的 luci-app-dockerman（如
 #      package/luci-app-dockerman，由 Packages.sh 从 ysuolmai 仓库拉取）时
-#      清掉 feeds 里的同名包；不存在则保留原有版本。
+#      清掉 feeds 里的同名包；不存在则保留原有版本。dockerd 同理，优先用
+#      自维护的 nftables 原生版本，避免 feeds 版把 xtables 依赖带进固件。
 #   2. luci-lib-docker 统一用 lisaac/luci-lib-docker。
 #   3. 去掉 luci-app-dockerman / luci-lib-docker 版本号里的 v 前缀，
 #      apk 只接受以数字开头的版本号（opkg 没这个限制）。
@@ -35,6 +36,22 @@ if [ -n "$MANAGED_DOCKERMAN" ] && [ -f "$MANAGED_DOCKERMAN/Makefile" ]; then
     log "使用自维护的 luci-app-dockerman: $MANAGED_DOCKERMAN"
 else
     log "未发现自维护 luci-app-dockerman，保留现有版本"
+fi
+
+# ===============================================================
+# 1.1 dockerd：优先用自维护的 nftables 原生版本
+#     feeds 版 dockerd 的 DEPENDS 带 +iptables / +iptables-mod-extra /
+#     +kmod-ipt-nat / +kmod-ipt-nat6 / +kmod-ipt-physdev，会把整套
+#     xtables 拉进固件；自维护版只依赖 firewall4 / nftables-json。
+#     两处同名包同时存在时扫描会选中 feeds 那份，所以这里删掉 feeds 副本。
+# ===============================================================
+MANAGED_DOCKERD=$(find package -maxdepth 3 -type d -name dockerd \
+    -not -path 'package/feeds/*' 2>/dev/null | head -n 1)
+if [ -n "$MANAGED_DOCKERD" ] && [ -f "$MANAGED_DOCKERD/Makefile" ]; then
+    rm -rf package/feeds/*/dockerd
+    log "使用自维护 dockerd: $MANAGED_DOCKERD（已移除 feeds 同名副本）"
+else
+    log "未发现自维护 dockerd，继续使用 feeds 版本"
 fi
 
 # ===============================================================
