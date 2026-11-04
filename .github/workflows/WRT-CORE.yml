@@ -46,7 +46,7 @@ on:
         type: boolean
       WRT_FIXES:
         required: false
-        default: false
+        default: true
         type: boolean
 
 env:

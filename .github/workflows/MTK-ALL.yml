@@ -66,5 +66,4 @@ jobs:
       WRT_PACKAGE: ${{inputs.PACKAGE}}
       #仅输出配置文件
       WRT_TEST: ${{inputs.TEST || false}}
-      #额外打包修复（nft / docker）
-      WRT_FIXES: true
+      #额外打包修复（nft / docker）默认开启，见 WRT-CORE
