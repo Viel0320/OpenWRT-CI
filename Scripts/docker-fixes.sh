@@ -9,9 +9,11 @@
 #      package/luci-app-dockerman，由 Packages.sh 从 ysuolmai 仓库拉取）时
 #      清掉 feeds 里的同名包；不存在则保留原有版本。
 #   2. luci-lib-docker 统一用 lisaac/luci-lib-docker。
-#   3. dockerd / docker CLI 版本跟随 moby/moby 最新 release，并修补
+#   3. 去掉 luci-app-dockerman / luci-lib-docker 版本号里的 v 前缀，
+#      apk 只接受以数字开头的版本号（opkg 没这个限制）。
+#   4. dockerd / docker CLI 版本跟随 moby/moby 最新 release，并修补
 #      PKG_GIT_SHORT_COMMIT、PKG_HASH、Build/Prepare、vendor 目录安装。
-#   4. 给 include/cmake.mk 补 CMAKE_POLICY_VERSION_MINIMUM（部分依赖包
+#   5. 给 include/cmake.mk 补 CMAKE_POLICY_VERSION_MINIMUM（部分依赖包
 #      cmake_minimum_required 低于 3.5，新版 cmake 会直接报错）。
 
 set -u
@@ -56,7 +58,20 @@ rm -rf temp_libdocker
 ./scripts/feeds install luci-lib-docker || log "luci-lib-docker 不在 feeds 中，使用本地目录"
 
 # ===============================================================
-# 3. dockerd 引擎 / docker CLI 版本对齐 moby 最新 release
+# 3. 版本号规范化：apk 要求版本号以数字开头
+#    luci-app-dockerman 是 v0.5.26，lisaac 的 luci-lib-docker 是 v0.3.4，
+#    opkg 能接受这种写法，apk 会直接报 "package version is invalid"。
+# ===============================================================
+for makefile in $(find package -maxdepth 3 -type f -name Makefile \
+        \( -path '*luci-app-dockerman*' -o -path '*luci-lib-docker*' \) 2>/dev/null); do
+    if grep -q '^PKG_VERSION:=v' "$makefile"; then
+        sed -i 's/^PKG_VERSION:=v/PKG_VERSION:=/' "$makefile"
+        log "去掉版本号前缀 v: $makefile"
+    fi
+done
+
+# ===============================================================
+# 4. dockerd 引擎 / docker CLI 版本对齐 moby 最新 release
 # ===============================================================
 log "查询 moby/moby 最新 release"
 _MOBY_TAG=$(curl -sf https://api.github.com/repos/moby/moby/releases/latest | \
@@ -122,7 +137,7 @@ else
 fi
 
 # ===============================================================
-# 4. cmake 最低版本策略（docker 依赖链里仍有 cmake_minimum_required(<3.5) 的包）
+# 5. cmake 最低版本策略（docker 依赖链里仍有 cmake_minimum_required(<3.5) 的包）
 # ===============================================================
 if [ -f include/cmake.mk ] && ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
     echo 'CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' >> include/cmake.mk
