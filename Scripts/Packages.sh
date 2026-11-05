@@ -96,6 +96,44 @@ UPDATE_PACKAGE "qmodem-generic" "LianXia233/luci-app-qmodem-generic" "main"
 # is properly parsed by UPDATE_PACKAGE to clean up conflicting feed directories.
 UPDATE_PACKAGE "dockerman" "ysuolmai/openwrt-packages" "main" "" "luci-app-dockerman dockerd"
 
+#安装 iStoreOS 应用（istoreenhance / unishare 及其依赖）
+#仓库是 apps/<应用>/<包名> 结构，只取需要的包，避免把 app-meta-* / tests 带进构建
+INSTALL_ISTORE_APP() {
+	local REPO_PATH="./package/istoreos-app-hub"
+
+	echo " "
+
+	rm -rf "$REPO_PATH"
+	if ! git clone --depth=1 --single-branch --branch main "https://github.com/istoreos/istoreos-app-hub.git" "$REPO_PATH"; then
+		echo "Clone istoreos-app-hub failed!"
+		return 1
+	fi
+
+	local SRC
+	for SRC in "$@"; do
+		local NAME=${SRC##*/}
+		if [ ! -d "$REPO_PATH/$SRC" ]; then
+			echo "Not found in istoreos-app-hub: $SRC"
+			continue
+		fi
+		echo "Install package: $NAME"
+		rm -rf "./package/$NAME" ./package/feeds/*/"$NAME"
+		cp -rf "$REPO_PATH/$SRC" "./package/$NAME"
+	done
+
+	rm -rf "$REPO_PATH"
+}
+
+INSTALL_ISTORE_APP \
+	"apps/istoreenhance/istoreenhance" \
+	"apps/istoreenhance/ks-cli" \
+	"apps/istoreenhance/luci-app-istoreenhance" \
+	"apps/linkeasefull/linkease-app-entry" \
+	"apps/linkeasefull/luci-lib-linkeaseauth" \
+	"apps/unishare/unishare" \
+	"apps/unishare/luci-app-unishare" \
+	"apps/webdav2/webdav2"
+
 #更新软件包版本
 UPDATE_VERSION() {
 	local PKG_NAME=$1
