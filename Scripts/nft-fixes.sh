@@ -9,8 +9,6 @@
 
 set -u
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-
 log() { echo "[nft-fix] $*"; }
 
 # ===============================================================
@@ -75,13 +73,11 @@ unset_config() {
     printf '# %s is not set\n' "$config_key" >> .config
 }
 
+# /**
+#  * Rewrite +kmod-iptables dependencies to +kmod-nf-ipt across all packages,
+#  * excluding the KernelPackage/nf-ipt definition block itself to avoid circular dependencies.
+#  */
 kmod_deps_fix() {
-    if [ -f "$SCRIPT_DIR/fix-kmod-iptables-deps.sh" ]; then
-        sh "$SCRIPT_DIR/fix-kmod-iptables-deps.sh" "$PWD"
-        return $?
-    fi
-
-    # 独立使用（没带 helper 脚本）时的等价实现
     local affected mk
     affected=$(grep -rl '+kmod-iptables' package/ feeds/ 2>/dev/null || true)
     [ -n "$affected" ] || { log "deps: 没有 +kmod-iptables 依赖"; return 0; }
@@ -93,10 +89,22 @@ kmod_deps_fix() {
     log "deps: 已把 +kmod-iptables 依赖改为 +kmod-nf-ipt"
 }
 
+# /**
+#  * Find Makefiles that depend on bare +iptables while excluding the iptables
+#  * package Makefile itself. Uses xargs -r so empty grep results do not hang or error.
+#  */
+find_iptables_consumers() {
+    grep -rlE '\+iptables([^-a-zA-Z0-9_]|$)' package/ feeds/ 2>/dev/null \
+        | xargs -r grep -lv 'PKG_NAME:=iptables' 2>/dev/null || true
+}
+
+# /**
+#  * Replace bare +iptables dependencies with +iptables-nft across consumer Makefiles
+#  * and verify that no residual +iptables references remain.
+#  */
 iptables_to_nft_fix() {
-    local affected remain mk
-    affected=$(grep -rlE '\+iptables([^-a-zA-Z0-9_]|$)' package/ feeds/ 2>/dev/null \
-        | xargs grep -lv 'PKG_NAME:=iptables' 2>/dev/null || true)
+    local affected remain remain_count mk
+    affected=$(find_iptables_consumers)
 
     if [ -z "$affected" ]; then
         log "deps: 没有文件依赖 +iptables（已是干净状态）"
@@ -110,9 +118,13 @@ iptables_to_nft_fix() {
         sed -i -E 's/\+iptables([^-a-zA-Z0-9_]|$)/+iptables-nft\1/g' "$mk"
     done
 
-    remain=$(grep -rlE '\+iptables([^-a-zA-Z0-9_]|$)' package/ feeds/ 2>/dev/null \
-        | xargs grep -lv 'PKG_NAME:=iptables' 2>/dev/null | wc -l)
-    log "deps: 替换完成，残留 $(echo "$remain" | tr -d ' ') 处（应为 0）"
+    remain=$(find_iptables_consumers)
+    if [ -z "$remain" ]; then
+        remain_count=0
+    else
+        remain_count=$(printf '%s\n' "$remain" | wc -l | tr -d ' ')
+    fi
+    log "deps: 替换完成，残留 ${remain_count} 处（应为 0）"
 }
 
 kmod_iptables_emptying() {

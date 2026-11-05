@@ -29,10 +29,12 @@ fi
 # ===============================================================
 # 1. LuCI dockerman
 # ===============================================================
+# Remove both package/feeds symlinks and underlying feeds/ directories when a
+# self-maintained luci-app-dockerman exists, preventing feed index collisions.
 MANAGED_DOCKERMAN=$(find package -maxdepth 3 -type d -name 'luci-app-dockerman' \
     -not -path 'package/feeds/*' 2>/dev/null | head -n 1)
 if [ -n "$MANAGED_DOCKERMAN" ] && [ -f "$MANAGED_DOCKERMAN/Makefile" ]; then
-    rm -rf package/feeds/luci/luci-app-dockerman
+    rm -rf package/feeds/luci/luci-app-dockerman feeds/luci/applications/luci-app-dockerman
     log "使用自维护的 luci-app-dockerman: $MANAGED_DOCKERMAN"
 else
     log "未发现自维护 luci-app-dockerman，保留现有版本"
@@ -45,10 +47,12 @@ fi
 #     xtables 拉进固件；自维护版只依赖 firewall4 / nftables-json。
 #     两处同名包同时存在时扫描会选中 feeds 那份，所以这里删掉 feeds 副本。
 # ===============================================================
+# Remove both package/feeds symlinks and feeds/packages/utils/dockerd so OpenWrt
+# package scanning strictly selects the self-maintained nftables-native dockerd.
 MANAGED_DOCKERD=$(find package -maxdepth 3 -type d -name dockerd \
     -not -path 'package/feeds/*' 2>/dev/null | head -n 1)
 if [ -n "$MANAGED_DOCKERD" ] && [ -f "$MANAGED_DOCKERD/Makefile" ]; then
-    rm -rf package/feeds/*/dockerd
+    rm -rf package/feeds/*/dockerd feeds/packages/utils/dockerd
     log "使用自维护 dockerd: $MANAGED_DOCKERD（已移除 feeds 同名副本）"
 else
     log "未发现自维护 dockerd，继续使用 feeds 版本"
@@ -90,9 +94,38 @@ done
 # ===============================================================
 # 4. dockerd 引擎 / docker CLI 版本对齐 moby 最新 release
 # ===============================================================
+# /**
+#  * Fetch a GitHub API endpoint, automatically attaching GITHUB_TOKEN if present
+#  * in the environment to avoid anonymous rate-limiting (60 req/hr) on shared CI runners.
+#  */
+github_api_get() {
+    local url="$1"
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$url"
+    else
+        curl -sf -H "Accept: application/vnd.github+json" "$url"
+    fi
+}
+
+# /**
+#  * Extract the first 7-character commit SHA from a GitHub commits API JSON array response.
+#  */
+parse_short_commit() {
+    if command -v jq >/dev/null 2>&1; then
+        jq -r 'if type == "array" and length > 0 then .[0].sha[:7] else empty end' 2>/dev/null || true
+    else
+        python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['sha'][:7] if isinstance(d,list) and d else '')" 2>/dev/null || true
+    fi
+}
+
 log "查询 moby/moby 最新 release"
-_MOBY_TAG=$(curl -sf https://api.github.com/repos/moby/moby/releases/latest | \
-    python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null || true)
+if command -v jq >/dev/null 2>&1; then
+    _MOBY_TAG=$(github_api_get "https://api.github.com/repos/moby/moby/releases/latest" | \
+        jq -r '.tag_name // empty' 2>/dev/null || true)
+else
+    _MOBY_TAG=$(github_api_get "https://api.github.com/repos/moby/moby/releases/latest" | \
+        python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null || true)
+fi
 DOCKER_VER=$(echo "$_MOBY_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
 
 if [ -z "$DOCKER_VER" ]; then
@@ -102,10 +135,10 @@ if [ -z "$DOCKER_VER" ]; then
     DOCKER_CLI_COMMIT="a82e528"
 else
     log "最新 Docker 版本: $DOCKER_VER (tag: $_MOBY_TAG)"
-    DOCKERD_COMMIT=$(curl -sf "https://api.github.com/repos/moby/moby/commits?sha=${_MOBY_TAG}&per_page=1" | \
-        python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['sha'][:7] if isinstance(d,list) and d else '')" 2>/dev/null || true)
-    DOCKER_CLI_COMMIT=$(curl -sf "https://api.github.com/repos/docker/cli/commits?sha=v${DOCKER_VER}&per_page=1" | \
-        python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['sha'][:7] if isinstance(d,list) and d else '')" 2>/dev/null || true)
+    DOCKERD_COMMIT=$(github_api_get "https://api.github.com/repos/moby/moby/commits?sha=${_MOBY_TAG}&per_page=1" | \
+        parse_short_commit)
+    DOCKER_CLI_COMMIT=$(github_api_get "https://api.github.com/repos/docker/cli/commits?sha=v${DOCKER_VER}&per_page=1" | \
+        parse_short_commit)
     if [ -z "$DOCKERD_COMMIT" ] || [ -z "$DOCKER_CLI_COMMIT" ]; then
         log "警告: 无法获取 commit hash，回退到已验证的 29.9.2 commit"
         DOCKER_VER="29.9.2"
@@ -115,11 +148,13 @@ else
 fi
 log "版本: $DOCKER_VER | dockerd: $DOCKERD_COMMIT | cli: $DOCKER_CLI_COMMIT"
 
-# 同名包可能同时存在多份 Makefile（feeds 一份、package/ 下自维护副本一份），
-# 实际参与编译的是哪一份取决于扫描顺序，所以全部都要修。
+# /**
+#  * Locate all Makefiles declaring the given PKG_NAME across package/ and feeds/.
+#  * Uses xargs -r to prevent grep from reading stdin when find returns no matches.
+#  */
 find_makefiles() {
     find package/ feeds/ -name Makefile -print0 2>/dev/null \
-        | xargs -0 grep -lE "^PKG_NAME:=$1$" 2>/dev/null || true
+        | xargs -0r grep -lE "^PKG_NAME:=$1$" 2>/dev/null || true
 }
 
 dockerd_makefiles=$(find_makefiles dockerd)

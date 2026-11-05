@@ -92,7 +92,9 @@ UPDATE_PACKAGE "mt5700m" "LianXia233/luci-app-mt5700m" "main"
 UPDATE_PACKAGE "netmonitor" "LianXia233/luci-app-netmonitor" "main"
 UPDATE_PACKAGE "qmodem-generic" "LianXia233/luci-app-qmodem-generic" "main"
 
-UPDATE_PACKAGE "dockerman" "ysuolmai/openwrt-packages" "main" "luci-app-dockerman"
+# Pass an empty 4th argument (PKG_SPECIAL) so the custom package list in the 5th argument
+# is properly parsed by UPDATE_PACKAGE to clean up conflicting feed directories.
+UPDATE_PACKAGE "dockerman" "ysuolmai/openwrt-packages" "main" "" "luci-app-dockerman dockerd"
 
 #更新软件包版本
 UPDATE_VERSION() {
