@@ -93,7 +93,6 @@ UPDATE_PACKAGE "netmonitor" "LianXia233/luci-app-netmonitor" "main"
 UPDATE_PACKAGE "qmodem-generic" "LianXia233/luci-app-qmodem-generic" "main"
 
 UPDATE_PACKAGE "dockerman" "ysuolmai/openwrt-packages" "main" "luci-app-dockerman"
-UPDATE_PACKAGE "honk" "kenzok8/openwrt-honk" "main" 
 
 #更新软件包版本
 UPDATE_VERSION() {
