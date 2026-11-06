@@ -103,7 +103,7 @@ git clone --depth=1 --single-branch --branch main https://github.com/sbwml/packa
 git clone --depth=1 --single-branch --branch main https://github.com/sbwml/packages_utils_containerd.git feeds/packages/utils/containerd
 git clone --depth=1 --single-branch --branch main https://github.com/sbwml/packages_utils_runc.git feeds/packages/utils/runc
 
-#安装 iStoreOS 应用（istoreenhance / unishare 及其依赖）
+#安装 iStoreOS 应用（unishare 及其依赖）
 #仓库是 apps/<应用>/<包名> 结构，只取需要的包，避免把 app-meta-* / tests 带进构建
 INSTALL_ISTORE_APP() {
 	local REPO_PATH="./package/istoreos-app-hub"
@@ -132,11 +132,6 @@ INSTALL_ISTORE_APP() {
 }
 
 INSTALL_ISTORE_APP \
-	"apps/istoreenhance/istoreenhance" \
-	"apps/istoreenhance/ks-cli" \
-	"apps/istoreenhance/luci-app-istoreenhance" \
-	"apps/linkeasefull/linkease-app-entry" \
-	"apps/linkeasefull/luci-lib-linkeaseauth" \
 	"apps/unishare/unishare" \
 	"apps/unishare/luci-app-unishare" \
 	"apps/webdav2/webdav2"
