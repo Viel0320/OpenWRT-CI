@@ -44,3 +44,9 @@ FIX "mini-diskmanager" "$PACKAGE_PATH/luci-app-mini-diskmanager" sed -i "s/servi
 #修改natmapt菜单位置
 FIX "natmapt" "$PACKAGE_PATH/luci-app-natmapt" sed -i "s/network/services/g" \
 	"$PACKAGE_PATH/luci-app-natmapt/root/usr/share/luci/menu.d/luci-app-natmap.json"
+
+# Pass CMAKE_POLICY_VERSION_MINIMUM=3.5 globally so legacy CMake packages (e.g. tini 0.19.0
+# required by dockerd, which declares cmake_minimum_required 2.8.0) configure under CMake 4+.
+if [ -f "./include/cmake.mk" ] && ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" "./include/cmake.mk"; then
+	echo 'CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' >> "./include/cmake.mk"
+fi

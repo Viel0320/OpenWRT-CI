@@ -92,9 +92,16 @@ UPDATE_PACKAGE "mt5700m" "LianXia233/luci-app-mt5700m" "main"
 UPDATE_PACKAGE "netmonitor" "LianXia233/luci-app-netmonitor" "main"
 UPDATE_PACKAGE "qmodem-generic" "LianXia233/luci-app-qmodem-generic" "main"
 
-# Pass an empty 4th argument (PKG_SPECIAL) so the custom package list in the 5th argument
-# is properly parsed by UPDATE_PACKAGE to clean up conflicting feed directories.
-UPDATE_PACKAGE "dockerman" "ysuolmai/openwrt-packages" "main" "" "luci-app-dockerman dockerd"
+# Replace feeds Docker suite in-place with sbwml's ucode dockerman and nftables-native runtime
+# so relative feed includes (../../luci.mk, ../../lang/golang/golang-package.mk) and sibling
+# version assertions (../containerd, ../runc, ../tini, ../dockerd) resolve natively.
+rm -rf feeds/luci/applications/luci-app-dockerman
+git clone --depth=1 --single-branch --branch openwrt-25.12 https://github.com/sbwml/luci-app-dockerman.git feeds/luci/applications/luci-app-dockerman
+rm -rf feeds/packages/utils/{docker,dockerd,containerd,runc}
+git clone --depth=1 --single-branch --branch main https://github.com/sbwml/packages_utils_docker.git feeds/packages/utils/docker
+git clone --depth=1 --single-branch --branch main https://github.com/sbwml/packages_utils_dockerd.git feeds/packages/utils/dockerd
+git clone --depth=1 --single-branch --branch main https://github.com/sbwml/packages_utils_containerd.git feeds/packages/utils/containerd
+git clone --depth=1 --single-branch --branch main https://github.com/sbwml/packages_utils_runc.git feeds/packages/utils/runc
 
 #安装 iStoreOS 应用（istoreenhance / unishare 及其依赖）
 #仓库是 apps/<应用>/<包名> 结构，只取需要的包，避免把 app-meta-* / tests 带进构建

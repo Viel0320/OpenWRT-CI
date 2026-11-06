@@ -191,7 +191,6 @@ jobs:
           cd ./wrt/
 
           $GITHUB_WORKSPACE/Scripts/nft-fixes.sh bridge
-          $GITHUB_WORKSPACE/Scripts/docker-fixes.sh
 
       - name: Custom Settings
         run: |
